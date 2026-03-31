@@ -192,13 +192,18 @@ function fitSvensson(rawPoints) {
 
 function r4(v) { return Math.round(v * 10000) / 10000; }
 
-/** Gera curva suave (n pontos) para uso nos gráficos */
-function smoothCurve(model, minT = 0.08, maxT = 35, n = 120) {
+/** Gera curva diária: 1 ponto por DU (como ANBIMA) — max 60 anos = 15120 DU */
+function smoothCurve(model, minT = 0.08, maxT = 35) {
   if (!model) return [];
-  return Array.from({ length: n }, (_, i) => {
-    const tau = minT * Math.exp(i * Math.log(maxT / minT) / (n - 1));
-    return { anos: r4(tau), taxa: r4(svYield(model._b, tau)) };
-  });
+  // 1 DU = 1/252 anos — gera um ponto por dia útil
+  const minDU = Math.max(1, Math.round(minT * 252));
+  const maxDU = Math.min(Math.round(maxT * 252), 15120);
+  const points = [];
+  for (let du = minDU; du <= maxDU; du++) {
+    const tau = du / 252;
+    points.push({ anos: r4(tau), taxa: r4(svYield(model._b, tau)) });
+  }
+  return points;
 }
 
 /** Avalia a curva nos vértices padrão ANBIMA */

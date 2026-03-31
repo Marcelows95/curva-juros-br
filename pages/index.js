@@ -108,6 +108,7 @@ function CurveCard({title,subtitle,color,rawPoints,curve,rmse,loading,extraScatt
             ticks:{color:T.muted,font:{family:"'IBM Plex Mono',monospace",size:9},callback:v=>`${v}a`},
             title:{display:true,text:'anos',color:T.dim,font:{family:"'IBM Plex Mono',monospace",size:9}}},
           y:{grid:{color:`${T.border}88`},
+            min:0,
             ticks:{color:T.muted,font:{family:"'IBM Plex Mono',monospace",size:9},callback:v=>`${v}%`},
             title:{display:true,text:'% a.a.',color:T.dim,font:{family:"'IBM Plex Mono',monospace",size:9}}},
         },
@@ -258,7 +259,7 @@ function HistoryChart({rows,chartReady}) {
         },
         scales:{
           x:{type:'time',time:{unit:'month',displayFormats:{month:"MMM 'yy"}},grid:{color:`${T.border}88`},ticks:{color:T.muted,font:{family:"'IBM Plex Mono',monospace",size:9},maxTicksLimit:12}},
-          y:{grid:{color:`${T.border}88`},ticks:{color:T.muted,font:{family:"'IBM Plex Mono',monospace",size:9},callback:v=>`${v}%`}},
+          y:{grid:{color:`${T.border}88`},min:0,ticks:{color:T.muted,font:{family:"'IBM Plex Mono',monospace",size:9},callback:v=>`${v}%`}},
         },
       },
     });
