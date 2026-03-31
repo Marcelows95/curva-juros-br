@@ -1,14 +1,43 @@
 /**
  * /api/curvas
- * 
+ *
  * Fontes:
  *   - Tesouro Direto (público, sem auth)  → Nominal + Real
  *   - BCB Olinda                           → IPCA Focus
- * 
+ *
+ * Histórico: salva snapshot diário no Supabase (upsert por data_ref)
  * Cache: 1h no edge da Vercel (s-maxage=3600)
  */
 
 export const config = { api: { responseLimit: false } };
+
+const SUPABASE_URL  = process.env.NEXT_PUBLIC_SUPABASE_URL  || 'https://yacgpbbcxjyoxvoxxpcp.supabase.co';
+const SUPABASE_ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlhY2dwYmJjeGp5b3h2b3h4cGNwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1NjMyNTYsImV4cCI6MjA5MDEzOTI1Nn0.K4mDL8Tgzt4YeLEgZtogHEuKWD3_7tUEHLDV49MmL4I';
+
+async function upsertSnapshot({ lastDate, nominal, real, implied, focus }) {
+  try {
+    // Parse date string dd/mm/yyyy → yyyy-mm-dd
+    const [d, m, y] = lastDate.split('/');
+    const data_ref = `${y}-${m}-${d}`;
+
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/yield_curve_snapshots`, {
+      method: 'POST',
+      headers: {
+        'apikey':        SUPABASE_ANON,
+        'Authorization': `Bearer ${SUPABASE_ANON}`,
+        'Content-Type':  'application/json',
+        'Prefer':        'resolution=merge-duplicates',
+      },
+      body: JSON.stringify({ data_ref, nominal, real, implied, focus }),
+    });
+    if (!res.ok) {
+      const err = await res.text();
+      console.warn('[upsertSnapshot] Supabase error:', res.status, err);
+    }
+  } catch (e) {
+    console.warn('[upsertSnapshot] failed:', e.message);
+  }
+}
 
 const CSV_URL =
   'https://www.tesourotransparente.gov.br/ckan/dataset/' +
@@ -175,6 +204,9 @@ export default async function handler(req, res) {
 
     const { lastDate, nominal, real, implied } = curvas.value;
     const focusData = focus.status === 'fulfilled' ? focus.value : [];
+
+    // Salva snapshot no Supabase (fire-and-forget — não bloqueia a resposta)
+    upsertSnapshot({ lastDate, nominal, real, implied, focus: focusData });
 
     res.json({
       ok: true,
