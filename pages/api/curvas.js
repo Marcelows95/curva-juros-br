@@ -83,50 +83,47 @@ async function fetchCurvas() {
   const iTaxaV = idx('Taxa Venda');
   const iTaxaC = idx('Taxa Compra');
 
-  // ── Find most recent Data Base (scan from end) ────────────────────────────
+  // ── Find most recent Data Base (max date across all rows) ───────────────
+  let maxDateTs = 0;
   let lastDate = null;
-  for (let i = lines.length - 1; i > 0; i--) {
+  for (let i = 1; i < lines.length; i++) {
     const cols = lines[i].split(';');
     const base = cols[iBase]?.trim();
     if (base && /^\d{2}\/\d{2}\/\d{4}$/.test(base)) {
-      lastDate = base;
-      break;
+      const d = parseBrDate(base);
+      if (d && d.getTime() > maxDateTs) {
+        maxDateTs = d.getTime();
+        lastDate = base;
+      }
     }
   }
   if (!lastDate) throw new Error('Nenhuma data encontrada no CSV');
 
-  const baseDate = parseBrDate(lastDate);
+  const baseDate = new Date(maxDateTs);
   const nominal = [];
   const real = [];
 
-  // Scan from end collecting rows for lastDate, stop when date changes
-  let collecting = false;
-  for (let i = lines.length - 1; i > 0; i--) {
+  // Collect all rows matching the most recent date
+  for (let i = 1; i < lines.length; i++) {
     const cols = lines[i].split(';');
     const base = cols[iBase]?.trim();
+    if (base !== lastDate) continue;
 
-    if (base === lastDate) {
-      collecting = true;
-      const tipo = cols[iType]?.trim() || '';
-      const vencStr = cols[iVenc]?.trim() || '';
-      const vencDate = parseBrDate(vencStr);
-      if (!vencDate) continue;
+    const tipo = cols[iType]?.trim() || '';
+    const vencStr = cols[iVenc]?.trim() || '';
+    const vencDate = parseBrDate(vencStr);
+    if (!vencDate) continue;
 
-      // Prefer taxa venda; fallback to compra
-      const taxa = parseBrFloat(cols[iTaxaV]) || parseBrFloat(cols[iTaxaC]);
-      if (isNaN(taxa) || taxa <= 0) continue;
+    const taxa = parseBrFloat(cols[iTaxaV]) || parseBrFloat(cols[iTaxaC]);
+    if (isNaN(taxa) || taxa <= 0) continue;
 
-      const anos = Math.round(yearsBetween(baseDate, vencDate) * 100) / 100;
-      if (anos <= 0) continue;
+    const anos = Math.round(yearsBetween(baseDate, vencDate) * 100) / 100;
+    if (anos <= 0) continue;
 
-      const point = { anos, taxa, vencimento: vencStr, tipo };
+    const point = { anos, taxa, vencimento: vencStr, tipo };
 
-      if (tipo.includes('Prefixado')) nominal.push(point);
-      else if (tipo.includes('IPCA')) real.push(point);
-    } else if (collecting) {
-      // Past the lastDate block
-      break;
-    }
+    if (tipo.includes('Prefixado')) nominal.push(point);
+    else if (tipo.includes('IPCA')) real.push(point);
   }
 
   nominal.sort((a, b) => a.anos - b.anos);
